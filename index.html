@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CAQ Newsroom — Editorial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Design tokens — match MyCroquet / newsroom-share ── */
+    :root {
+      --background:    #FAFAF8;
+      --foreground:    #1a1a1a;
+      --muted:         #f4f4f2;
+      --muted-fg:      #737373;
+      --border:        #e8e6e3;
+      --accent:        #73182C;
+      --accent-hover:  #8a1e35;
+      --accent-muted:  rgba(115, 24, 44, 0.07);
+      --ring:          rgba(115, 24, 44, 0.12);
+      --green:         #82b25e;
+      --green-muted:   rgba(130, 178, 94, 0.1);
+      --blue:          #3b82f6;
+      --blue-muted:    rgba(59, 130, 246, 0.1);
+      --purple:        #8b5cf6;
+      --purple-muted:  rgba(139, 92, 246, 0.1);
+      --yellow:        #f59e0b;
+      --yellow-muted:  rgba(245, 158, 11, 0.1);
+      --radius:        8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--accent);
+      color: #fff;
+      padding: 20px 24px;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .header p  { font-size: 13px; opacity: .8; margin-top: 2px; }
+
+    /* ── Filter tabs ── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      background: #fff;
+    }
+    .tab {
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted-fg);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all .15s;
+    }
+    .tab:hover { color: var(--foreground); }
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* ── Queue grid ── */
+    .queue {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+      padding: 24px;
+      max-width: 1200px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      transition: box-shadow .15s, border-color .15s;
+    }
+    .card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 2px 8px var(--ring);
+    }
+    .card-cover {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
+      background: var(--muted);
+      display: block;
+    }
+    .card-cover-placeholder {
+      width: 100%;
+      height: 140px;
+      background: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted-fg);
+      font-size: 13px;
+    }
+    .card-body { padding: 14px 16px; }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted-fg);
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .badge-submitted    { background: var(--blue-muted);   color: var(--blue); }
+    .badge-draft        { background: var(--muted);        color: var(--muted-fg); }
+    .badge-published    { background: var(--green-muted);  color: var(--green); }
+    .badge-pending_edit { background: var(--purple-muted); color: var(--purple); }
+
+    /* ── Detail view ── */
+    .detail { display: none; padding: 24px; max-width: 1200px; }
+    .detail.visible { display: block; }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted-fg);
+      cursor: pointer;
+      margin-bottom: 16px;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+    .back-btn:hover { color: var(--foreground); }
+
+    .detail-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 768px) {
+      .detail-layout { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .panel h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: var(--muted-fg);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted-fg);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--foreground);
+      background: var(--background);
+      transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+    .field textarea { resize: vertical; }
+    .field textarea.body-input {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      min-height: 320px;
+    }
+
+    .cover-img {
+      max-width: 100%;
+      border-radius: 6px;
+      margin-bottom: 14px;
+    }
+
+    /* ── Preview ── */
+    .preview-content {
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--foreground);
+    }
+    .preview-content img { max-width: 100%; border-radius: 6px; }
+    .preview-content p   { margin-bottom: 12px; }
+    .preview-content h1, .preview-content h2, .preview-content h3 {
+      margin: 16px 0 8px;
+    }
+
+    /* ── Review feedback callout ── */
+    .feedback-callout {
+      background: var(--yellow-muted);
+      border: 1px solid var(--yellow);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .feedback-callout strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #92400e;
+    }
+
+    /* ── Action bar ── */
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .btn {
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+      background: #fff;
+      color: var(--foreground);
+    }
+    .btn:hover { border-color: var(--muted-fg); }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn-green {
+      background: var(--green);
+      color: #fff;
+      border-color: var(--green);
+    }
+    .btn-green:hover { opacity: .9; }
+    .btn-danger {
+      color: #dc2626;
+      border-color: #fecaca;
+    }
+    .btn-danger:hover { background: #fef2f2; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Reject inline ── */
+    .reject-form {
+      display: none;
+      margin-top: 12px;
+    }
+    .reject-form.visible { display: block; }
+    .reject-form textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      min-height: 80px;
+      margin-bottom: 8px;
+      resize: vertical;
+    }
+
+    /* ── Polish modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 80vh;
+      overflow: auto;
+      padding: 24px;
+    }
+    .modal h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .modal .diff-panes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 768px) {
+      .modal .diff-panes { grid-template-columns: 1fr; }
+    }
+    .modal .diff-pane {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 400px;
+      overflow: auto;
+    }
+    .modal .diff-pane h4 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted-fg);
+      margin-bottom: 8px;
+    }
+    .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ── Loading / empty ── */
+    .loading, .empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--muted-fg);
+      font-size: 14px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--foreground);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 200;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all .2s;
+      pointer-events: none;
+    }
+    .toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>CAQ Newsroom</h1>
+  <p>Editorial queue</p>
+</div>
+
+<!-- ── Queue View ── -->
+<div id="queue-view">
+  <div class="tabs">
+    <div class="tab active" data-status="">All</div>
+    <div class="tab" data-status="submitted">Submitted</div>
+    <div class="tab" data-status="draft">Draft</div>
+    <div class="tab" data-status="published">Published</div>
+  </div>
+  <div id="search-bar" style="display:none;padding:12px 24px 0;max-width:1200px">
+    <input type="search" id="search-input" placeholder="Search published articles..."
+      style="width:100%;max-width:400px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;background:var(--background)"
+      oninput="onSearchInput()">
+  </div>
+  <div id="queue" class="queue">
+    <div class="loading"><span class="spinner"></span> Loading articles...</div>
+  </div>
+  <div id="load-more-wrap" style="display:none;text-align:center;padding:0 24px 24px">
+    <button class="btn" id="load-more-btn" onclick="loadMore()">Load more</button>
+  </div>
+</div>
+
+<!-- ── Detail View ── -->
+<div id="detail-view" class="detail">
+  <button class="back-btn" onclick="showQueue()">&larr; Back to queue</button>
+
+  <div id="feedback-callout" class="feedback-callout" style="display:none">
+    <strong>Review feedback</strong>
+    <span id="feedback-text"></span>
+  </div>
+
+  <div class="detail-layout">
+    <!-- Edit panel -->
+    <div class="panel">
+      <h2>Edit <span id="ed-id" style="font-weight:400;font-size:12px;color:var(--muted-fg);font-family:monospace;text-transform:none;letter-spacing:0"></span></h2>
+      <div id="detail-cover"></div>
+      <div class="field">
+        <label>Title</label>
+        <input type="text" id="ed-title">
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="ed-category">
+          <option>News</option>
+          <option>Coaching</option>
+          <option>Governance</option>
+          <option>Events</option>
+          <option>Community</option>
+          <option>Opinion</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Excerpt</label>
+        <textarea id="ed-excerpt" rows="3"></textarea>
+      </div>
+      <div class="field">
+        <label>Body (HTML)</label>
+        <textarea id="ed-body" class="body-input" oninput="updatePreview()"></textarea>
+      </div>
+
+      <div class="actions" id="action-bar"></div>
+
+      <div id="reject-form" class="reject-form">
+        <textarea id="reject-feedback" placeholder="Feedback for the author..."></textarea>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-danger" onclick="submitReject()">Send Rejection</button>
+          <button class="btn" onclick="toggleRejectForm(false)">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview panel -->
+    <div class="panel">
+      <h2>Preview</h2>
+      <div id="preview" class="preview-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Polish modal ── -->
+<div id="polish-modal" class="modal-overlay" onclick="if(event.target===this)closePolishModal()">
+  <div class="modal">
+    <h3>AI Polish — Review Changes</h3>
+    <div class="diff-panes">
+      <div class="diff-pane">
+        <h4>Original</h4>
+        <div id="polish-original"></div>
+      </div>
+      <div class="diff-pane">
+        <h4>Polished</h4>
+        <div id="polish-result"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closePolishModal()">Discard</button>
+      <button class="btn btn-primary" onclick="acceptPolish()">Accept</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast" class="toast"></div>
+
+<script>
+const PB_URL = '';  // proxied through our backend
+let currentArticle = null;
+let polishedBody = '';
+let currentFilter = '';
+let currentSearch = '';
+let currentPage = 1;
+let totalPages = 1;
+let searchDebounce = null;
+
+// ── Utilities ──────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 2500);
+}
+
+function relativeTime(dateStr) {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = Math.floor((now - then) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function badgeClass(status) {
+  return 'badge badge-' + (status || 'draft').replace(/ /g, '_');
+}
+
+function badgeLabel(status) {
+  return (status || 'draft').replace(/_/g, ' ');
+}
+
+function coverUrl(article, size) {
+  if (!article.cover_image) return '';
+  return `/api/articles/${article.id}/cover?thumb=${size || '200x140'}`;
+}
+
+// ── API helpers ────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(path, opts);
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(txt);
+  }
+  return r.json();
+}
+
+// ── Queue View ─────────────────────────────────────────────────────
+function buildArticleCard(a) {
+  const coverHtml = a.cover_image
+    ? `<img class="card-cover" src="/api/articles/${a.id}/cover?thumb=200x140&filename=${encodeURIComponent(a.cover_image)}&collection_id=${encodeURIComponent(a.collectionId)}" alt="" loading="lazy">`
+    : `<div class="card-cover-placeholder">No cover image</div>`;
+  return `
+    <div class="card" onclick="openArticle('${a.id}')">
+      ${coverHtml}
+      <div class="card-body">
+        <div class="card-title">${esc(a.title)}</div>
+        <div class="card-meta">
+          <span class="${badgeClass(a.status)}">${badgeLabel(a.status)}</span>
+          <span>${esc(a.author_name || 'Unknown')}</span>
+          <span>${esc(a.category || '')}</span>
+          <span>${relativeTime(a.updated)}</span>
+          <span style="opacity:.5;font-family:monospace">${esc(a.id)}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function loadQueue(status) {
+  currentFilter = status !== undefined ? (status || '') : currentFilter;
+  currentPage = 1;
+  currentSearch = '';
+  document.getElementById('search-input').value = '';
+
+  const queueEl = document.getElementById('queue');
+  queueEl.innerHTML = '<div class="loading"><span class="spinner"></span> Loading articles...</div>';
+
+  // Update active tab
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.status === currentFilter);
+  });
+
+  // Show search bar only on Published tab
+  document.getElementById('search-bar').style.display =
+    currentFilter === 'published' ? '' : 'none';
+
+  try {
+    let url = `/api/articles?page=1&perPage=20`;
+    if (currentFilter) url += `&status=${encodeURIComponent(currentFilter)}`;
+    const data = await api('GET', url);
+    totalPages = data.totalPages || 1;
+    const items = data.items || [];
+
+    if (items.length === 0) {
+      queueEl.innerHTML = '<div class="empty">No articles found</div>';
+      document.getElementById('load-more-wrap').style.display = 'none';
+      return;
+    }
+
+    queueEl.innerHTML = items.map(buildArticleCard).join('');
+    document.getElementById('load-more-wrap').style.display =
+      totalPages > 1 ? '' : 'none';
+  } catch (e) {
+    queueEl.innerHTML = `<div class="empty">Error loading articles: ${esc(e.message)}</div>`;
+    document.getElementById('load-more-wrap').style.display = 'none';
+  }
+}
+
+async function loadMore() {
+  if (currentPage >= totalPages) return;
+  currentPage++;
+  const btn = document.getElementById('load-more-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+
+  try {
+    let url = `/api/articles?page=${currentPage}&perPage=20`;
+    if (currentFilter) url += `&status=${encodeURIComponent(currentFilter)}`;
+    if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
+    const data = await api('GET', url);
+    totalPages = data.totalPages || totalPages;
+    const items = data.items || [];
+    const queueEl = document.getElementById('queue');
+    queueEl.insertAdjacentHTML('beforeend', items.map(buildArticleCard).join(''));
+    document.getElementById('load-more-wrap').style.display =
+      currentPage >= totalPages ? 'none' : '';
+  } catch (e) {
+    toast('Error loading more: ' + e.message);
+    currentPage--;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Load more';
+  }
+}
+
+function onSearchInput() {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(async () => {
+    currentSearch = document.getElementById('search-input').value.trim();
+    currentPage = 1;
+    const queueEl = document.getElementById('queue');
+    queueEl.innerHTML = '<div class="loading"><span class="spinner"></span> Searching...</div>';
+
+    try {
+      let url = `/api/articles?page=1&perPage=20&status=published`;
+      if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
+      const data = await api('GET', url);
+      totalPages = data.totalPages || 1;
+      const items = data.items || [];
+      if (items.length === 0) {
+        queueEl.innerHTML = '<div class="empty">No results</div>';
+        document.getElementById('load-more-wrap').style.display = 'none';
+        return;
+      }
+      queueEl.innerHTML = items.map(buildArticleCard).join('');
+      document.getElementById('load-more-wrap').style.display =
+        totalPages > 1 ? '' : 'none';
+    } catch (e) {
+      queueEl.innerHTML = `<div class="empty">Search error: ${esc(e.message)}</div>`;
+    }
+  }, 300);
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+// ── Detail View ────────────────────────────────────────────────────
+async function openArticle(id) {
+  document.getElementById('queue-view').style.display = 'none';
+  const detail = document.getElementById('detail-view');
+  detail.classList.add('visible');
+
+  try {
+    currentArticle = await api('GET', `/api/articles/${id}`);
+    populateDetail();
+  } catch (e) {
+    toast('Error loading article: ' + e.message);
+  }
+}
+
+function populateDetail() {
+  const a = currentArticle;
+
+  // Cover image
+  const coverEl = document.getElementById('detail-cover');
+  if (a.cover_image) {
+    coverEl.innerHTML = `<img class="cover-img" src="/api/articles/${a.id}/cover?thumb=600x400" alt="">`;
+  } else {
+    coverEl.innerHTML = '';
+  }
+
+  // Fields
+  document.getElementById('ed-id').textContent = a.id;
+  document.getElementById('ed-title').value = a.title || '';
+  document.getElementById('ed-category').value = a.category || 'News';
+  document.getElementById('ed-excerpt').value = a.excerpt || '';
+  document.getElementById('ed-body').value = a.body || '';
+
+  // Feedback callout
+  const fb = document.getElementById('feedback-callout');
+  if (a.review_feedback) {
+    document.getElementById('feedback-text').textContent = a.review_feedback;
+    fb.style.display = 'block';
+  } else {
+    fb.style.display = 'none';
+  }
+
+  // Preview
+  updatePreview();
+
+  // Action buttons
+  renderActions(a.status);
+
+  // Hide reject form
+  toggleRejectForm(false);
+}
+
+function updatePreview() {
+  const body = document.getElementById('ed-body').value;
+  document.getElementById('preview').innerHTML = body;
+}
+
+function renderActions(status) {
+  const bar = document.getElementById('action-bar');
+  let html = '';
+
+  // Save — always
+  html += '<button class="btn btn-primary" onclick="saveArticle()">Save</button>';
+
+  // Polish — always
+  html += '<button class="btn" onclick="polishArticle()" id="btn-polish">Polish with AI</button>';
+
+  // Publish — for submitted, draft, pending_edit
+  if (['submitted', 'draft', 'pending_edit'].includes(status)) {
+    html += '<button class="btn btn-green" onclick="publishArticle()">Publish</button>';
+  }
+
+  // Reject — for submitted, pending_edit
+  if (['submitted', 'pending_edit'].includes(status)) {
+    html += '<button class="btn btn-danger" onclick="toggleRejectForm(true)">Reject</button>';
+  }
+
+  // Archive — for published
+  if (status === 'published') {
+    html += '<button class="btn btn-danger" onclick="archiveArticle()">Archive</button>';
+  }
+
+  bar.innerHTML = html;
+}
+
+// ── Actions ────────────────────────────────────────────────────────
+async function saveArticle() {
+  try {
+    const data = {
+      title: document.getElementById('ed-title').value,
+      body: document.getElementById('ed-body').value,
+      excerpt: document.getElementById('ed-excerpt').value,
+      category: document.getElementById('ed-category').value,
+    };
+    currentArticle = await api('PATCH', `/api/articles/${currentArticle.id}`, data);
+    toast('Saved');
+    populateDetail();
+  } catch (e) {
+    toast('Save failed: ' + e.message);
+  }
+}
+
+async function publishArticle() {
+  if (!confirm('Publish this article? It will appear on news.croquetqld.org within ~60 seconds.')) return;
+  try {
+    currentArticle = await api('POST', `/api/articles/${currentArticle.id}/publish`);
+    toast('Published');
+    populateDetail();
+  } catch (e) {
+    toast('Publish failed: ' + e.message);
+  }
+}
+
+function toggleRejectForm(show) {
+  document.getElementById('reject-form').classList.toggle('visible', show);
+  if (show) document.getElementById('reject-feedback').focus();
+}
+
+async function submitReject() {
+  const feedback = document.getElementById('reject-feedback').value;
+  try {
+    currentArticle = await api('POST', `/api/articles/${currentArticle.id}/reject`, { feedback });
+    toast('Rejected — feedback sent');
+    populateDetail();
+  } catch (e) {
+    toast('Reject failed: ' + e.message);
+  }
+}
+
+async function archiveArticle() {
+  if (!confirm('Archive this article? It will be removed from the public site.')) return;
+  try {
+    currentArticle = await api('POST', `/api/articles/${currentArticle.id}/archive`);
+    toast('Archived');
+    showQueue();
+  } catch (e) {
+    toast('Archive failed: ' + e.message);
+  }
+}
+
+async function polishArticle() {
+  const btn = document.getElementById('btn-polish');
+  btn.disabled = true;
+  btn.textContent = 'Polishing...';
+  try {
+    const result = await api('POST', `/api/articles/${currentArticle.id}/polish`);
+    polishedBody = result.polished;
+
+    // Show modal
+    document.getElementById('polish-original').innerHTML = currentArticle.body || '';
+    document.getElementById('polish-result').innerHTML = polishedBody;
+    document.getElementById('polish-modal').classList.add('visible');
+  } catch (e) {
+    toast('Polish failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Polish with AI';
+  }
+}
+
+function acceptPolish() {
+  document.getElementById('ed-body').value = polishedBody;
+  updatePreview();
+  closePolishModal();
+  toast('Polished text applied — click Save to persist');
+}
+
+function closePolishModal() {
+  document.getElementById('polish-modal').classList.remove('visible');
+}
+
+// ── Navigation ─────────────────────────────────────────────────────
+function showQueue() {
+  document.getElementById('detail-view').classList.remove('visible');
+  document.getElementById('queue-view').style.display = '';
+  currentArticle = null;
+  loadQueue(currentFilter);  // re-fetch current tab (preserves filter, resets to page 1)
+}
+
+// ── Tab clicks ─────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => loadQueue(tab.dataset.status));
+});
+
+// ── Init ───────────────────────────────────────────────────────────
+loadQueue();
+</script>
+</body>
+</html>
