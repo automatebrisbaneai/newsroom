@@ -1155,16 +1155,11 @@ async function polishArticle() {
   if (promptBtn) { promptBtn.disabled = true; promptBtn.textContent = 'Polishing...'; }
   if (btn) { btn.disabled = true; btn.textContent = 'Polishing...'; }
 
-  // Save current Quill content to PB first so polish endpoint reads latest
   const currentBody = quill.root.innerHTML;
 
   try {
-    // Patch the body to PB so polish endpoint reads current editor state
-    if (!isCreateMode && currentArticle) {
-      await api('PATCH', `/api/articles/${currentArticle.id}`, { body: currentBody });
-    }
-
-    const result = await api('POST', `/api/articles/${currentArticle.id}/polish`);
+    // Send body directly to polish — no need to save to PB first
+    const result = await api('POST', `/api/articles/${currentArticle.id}/polish`, { body: currentBody });
     polishedBody = result.polished;
     polishedTitle = result.title || '';
     polishedExcerpt = result.excerpt || '';

@@ -192,13 +192,20 @@ async def archive_article(article_id: str):
     return r.json()
 
 
+class PolishBody(BaseModel):
+    body: str = ""
+
+
 @app.post("/api/articles/{article_id}/polish")
-async def polish_article(article_id: str):
-    # Fetch current body from PB
-    article = _pb_request(
-        "get", f"/api/collections/news_articles/records/{article_id}"
-    ).json()
-    article_body = article.get("body", "")
+async def polish_article(article_id: str, payload: PolishBody | None = None):
+    # Use body from request if provided, otherwise fetch from PB
+    if payload and payload.body.strip():
+        article_body = payload.body
+    else:
+        article = _pb_request(
+            "get", f"/api/collections/news_articles/records/{article_id}"
+        ).json()
+        article_body = article.get("body", "")
     if not article_body.strip():
         raise HTTPException(status_code=422, detail="Article body is empty")
 
