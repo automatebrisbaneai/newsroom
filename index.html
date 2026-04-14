@@ -713,6 +713,18 @@
 <div id="polish-modal" class="modal-overlay" onclick="if(event.target===this)closePolishModal()">
   <div class="modal">
     <h3>AI Polish — Review Changes</h3>
+    <div id="polish-suggestions" style="display:none;margin-bottom:16px">
+      <div style="display:grid;gap:10px">
+        <div style="background:var(--blue-muted);border:1px solid var(--blue);border-radius:6px;padding:10px 14px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--blue);margin-bottom:4px">Suggested Headline</div>
+          <div id="polish-title" style="font-size:15px;font-weight:600"></div>
+        </div>
+        <div style="background:var(--muted);border:1px solid var(--border);border-radius:6px;padding:10px 14px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-fg);margin-bottom:4px">Suggested Excerpt</div>
+          <div id="polish-excerpt" style="font-size:13px;line-height:1.5"></div>
+        </div>
+      </div>
+    </div>
     <div class="diff-panes">
       <div class="diff-pane">
         <h4>Original</h4>
@@ -754,6 +766,8 @@ quill.on('text-change', () => updatePreview());
 // ── State ──────────────────────────────────────────────────────────
 let currentArticle = null;
 let polishedBody = '';
+let polishedTitle = '';
+let polishedExcerpt = '';
 let currentFilter = '';
 let currentSearch = '';
 let currentPage = 1;
@@ -1178,6 +1192,18 @@ async function polishArticle() {
 
     const result = await api('POST', `/api/articles/${currentArticle.id}/polish`);
     polishedBody = result.polished;
+    polishedTitle = result.title || '';
+    polishedExcerpt = result.excerpt || '';
+
+    // Show suggestions if available
+    const suggestionsEl = document.getElementById('polish-suggestions');
+    if (polishedTitle || polishedExcerpt) {
+      document.getElementById('polish-title').textContent = polishedTitle;
+      document.getElementById('polish-excerpt').textContent = polishedExcerpt;
+      suggestionsEl.style.display = '';
+    } else {
+      suggestionsEl.style.display = 'none';
+    }
 
     // Show modal
     document.getElementById('polish-original').innerHTML = currentBody;
@@ -1193,13 +1219,21 @@ async function polishArticle() {
 
 function acceptPolish() {
   quill.root.innerHTML = polishedBody;
+  if (polishedTitle) document.getElementById('ed-title').value = polishedTitle;
+  if (polishedExcerpt) document.getElementById('ed-excerpt').value = polishedExcerpt;
   updatePreview();
   closePolishModal();
-  toast('Polished text applied — click Save to persist');
+  const parts = ['body'];
+  if (polishedTitle) parts.push('title');
+  if (polishedExcerpt) parts.push('excerpt');
+  toast(`Updated ${parts.join(', ')} — click Save to persist`);
 }
 
 function closePolishModal() {
   document.getElementById('polish-modal').classList.remove('visible');
+  document.getElementById('polish-suggestions').style.display = 'none';
+  polishedTitle = '';
+  polishedExcerpt = '';
 }
 
 // ── New Story ──────────────────────────────────────────────────────

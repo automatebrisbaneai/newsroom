@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from datetime import datetime, timezone
@@ -217,19 +218,31 @@ async def polish_article(article_id: str):
                         "Clean up this article body (HTML). "
                         "Fix grammar, punctuation, and awkward phrasing. Trim filler words. "
                         "Keep the meaning, tone, and all facts exactly as submitted. "
-                        "Return clean HTML only — no commentary, no markdown, no wrapper."
+                        "Also generate a short punchy headline (8 words or fewer) and a "
+                        "1-2 sentence excerpt/summary. "
+                        'Return JSON only: {"title": "...", "excerpt": "...", "body": "...cleaned HTML..."}'
                     ),
                 },
                 {"role": "user", "content": article_body},
             ],
             "max_tokens": 4096,
+            "response_format": {"type": "json_object"},
         },
         timeout=60,
     )
     data = res.json()
     if "choices" not in data:
         raise HTTPException(status_code=502, detail=f"OpenRouter error: {data}")
-    return {"polished": data["choices"][0]["message"]["content"]}
+    raw = data["choices"][0]["message"]["content"]
+    try:
+        parsed = json.loads(raw)
+        return {
+            "polished": parsed.get("body", raw),
+            "title": parsed.get("title"),
+            "excerpt": parsed.get("excerpt"),
+        }
+    except (json.JSONDecodeError, KeyError):
+        return {"polished": raw}
 
 
 @app.get("/api/stats")
