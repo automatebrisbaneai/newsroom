@@ -1,30 +1,18 @@
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 
 _env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(_env_path)
-print(f"[newsroom] .env path: {_env_path} exists={_env_path.exists()}")
-print(f"[newsroom] PB_ADMIN_EMAIL={os.environ.get('PB_ADMIN_EMAIL', 'NOT SET')}")
 
-import logging
-import traceback
 import requests as http_requests
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
 app = FastAPI()
-
-@app.exception_handler(Exception)
-async def debug_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}")
-    logger.error(traceback.format_exc())
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 # ── Config ──────────────────────────────────────────────────────────
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
@@ -92,6 +80,13 @@ class PatchBody(BaseModel):
 
 class RejectBody(BaseModel):
     feedback: str = ""
+
+
+class CreateBody(BaseModel):
+    title: str
+    body: str = ""
+    excerpt: str = ""
+    category: str = "News"
 
 
 # ── Routes ──────────────────────────────────────────────────────────
@@ -235,3 +230,45 @@ async def polish_article(article_id: str):
     if "choices" not in data:
         raise HTTPException(status_code=502, detail=f"OpenRouter error: {data}")
     return {"polished": data["choices"][0]["message"]["content"]}
+
+
+@app.get("/api/stats")
+async def get_stats():
+    counts = {}
+    for status in ("submitted", "draft", "published"):
+        r = _pb_request(
+            "get",
+            "/api/collections/news_articles/records",
+            params={"filter": f"status='{status}'", "perPage": 1},
+        )
+        counts[status] = r.json().get("totalItems", 0)
+    return counts
+
+
+@app.post("/api/articles")
+async def create_article(body: CreateBody):
+    slug = re.sub(r"[^a-z0-9]+", "-", body.title.lower()).strip("-")
+    slug = slug[:80]
+    r = _pb_request(
+        "post",
+        "/api/collections/news_articles/records",
+        json={
+            "title": body.title,
+            "body": body.body,
+            "excerpt": body.excerpt,
+            "category": body.category,
+            "status": "draft",
+            "slug": slug,
+        },
+    )
+    return r.json()
+
+
+@app.post("/api/articles/{article_id}/accept")
+async def accept_article(article_id: str):
+    r = _pb_request(
+        "patch",
+        f"/api/collections/news_articles/records/{article_id}",
+        json={"status": "draft", "review_feedback": ""},
+    )
+    return r.json()

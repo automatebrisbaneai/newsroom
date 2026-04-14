@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
   <style>
     /* ── Design tokens — match MyCroquet / newsroom-share ── */
     :root {
@@ -45,7 +46,13 @@
       color: #fff;
       padding: 20px 24px;
     }
-    .header h1 { font-size: 20px; font-weight: 700; }
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .header h1:hover { opacity: .85; }
     .header p  { font-size: 13px; opacity: .8; margin-top: 2px; }
 
     /* ── Filter tabs ── */
@@ -140,6 +147,84 @@
     .badge-published    { background: var(--green-muted);  color: var(--green); }
     .badge-pending_edit { background: var(--purple-muted); color: var(--purple); }
 
+    /* ── Dashboard view ── */
+    #dashboard-view {
+      display: none;
+      padding: 24px;
+      max-width: 1200px;
+    }
+    #dashboard-view.visible { display: block; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 600px) {
+      .stats-row { grid-template-columns: 1fr; }
+    }
+    .stat-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-card .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted-fg);
+      margin-bottom: 8px;
+    }
+    .stat-card .stat-count {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-submitted .stat-count { color: var(--blue); }
+    .stat-draft     .stat-count { color: var(--muted-fg); }
+    .stat-published .stat-count { color: var(--green); }
+
+    .action-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .action-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 16px;
+      cursor: pointer;
+      transition: box-shadow .15s, border-color .15s;
+      text-align: center;
+    }
+    .action-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 2px 8px var(--ring);
+    }
+    .action-card .action-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .action-card .action-label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .action-card .action-desc {
+      font-size: 12px;
+      color: var(--muted-fg);
+      margin-top: 4px;
+    }
+    .action-card-primary {
+      background: var(--accent-muted);
+      border-color: var(--accent);
+    }
+    .action-card-primary .action-label { color: var(--accent); }
+
     /* ── Detail view ── */
     .detail { display: none; padding: 24px; max-width: 1200px; }
     .detail.visible { display: block; }
@@ -158,6 +243,52 @@
       font-family: inherit;
     }
     .back-btn:hover { color: var(--foreground); }
+
+    /* ── Status banner ── */
+    .status-banner {
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .status-banner-submitted {
+      background: var(--blue-muted);
+      border: 1px solid var(--blue);
+      color: #1d4ed8;
+    }
+    .status-banner-draft {
+      background: var(--muted);
+      border: 1px solid var(--border);
+      color: var(--muted-fg);
+    }
+    .status-banner-published {
+      background: var(--green-muted);
+      border: 1px solid var(--green);
+      color: #3a6e1f;
+    }
+    .status-banner-label { font-weight: 700; }
+
+    /* ── Polish prompt card (for submitted) ── */
+    .polish-prompt {
+      background: var(--blue-muted);
+      border: 1px solid var(--blue);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .polish-prompt p {
+      font-size: 13px;
+      color: #1d4ed8;
+      font-weight: 500;
+    }
 
     .detail-layout {
       display: grid;
@@ -210,11 +341,36 @@
       box-shadow: 0 0 0 3px var(--ring);
     }
     .field textarea { resize: vertical; }
-    .field textarea.body-input {
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-      min-height: 320px;
+
+    /* ── Quill editor overrides ── */
+    .field .quill-wrap {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      transition: border-color .15s, box-shadow .15s;
     }
+    .field .quill-wrap:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+    .field .quill-wrap .ql-toolbar {
+      border: none;
+      border-bottom: 1px solid var(--border);
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      padding: 6px 8px;
+    }
+    .field .quill-wrap .ql-container {
+      border: none;
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-size: 14px;
+    }
+    .field .quill-wrap .ql-editor {
+      min-height: 300px;
+      color: var(--foreground);
+      background: var(--background);
+      padding: 10px 12px;
+    }
+    .field .quill-wrap .ql-editor p { margin-bottom: 8px; }
 
     .cover-img {
       max-width: 100%;
@@ -283,6 +439,12 @@
       border-color: var(--green);
     }
     .btn-green:hover { opacity: .9; }
+    .btn-blue {
+      background: var(--blue);
+      color: #fff;
+      border-color: var(--blue);
+    }
+    .btn-blue:hover { opacity: .9; }
     .btn-danger {
       color: #dc2626;
       border-color: #fecaca;
@@ -406,17 +568,66 @@
 <body>
 
 <div class="header">
-  <h1>CAQ Newsroom</h1>
-  <p>Editorial queue</p>
+  <h1 onclick="showDashboard()">CAQ Newsroom</h1>
+  <p id="header-subtitle">Dashboard</p>
+</div>
+
+<!-- ── Dashboard View ── -->
+<div id="dashboard-view">
+  <div class="stats-row">
+    <div class="stat-card stat-submitted">
+      <div class="stat-label">Submitted</div>
+      <div class="stat-count" id="stat-submitted">–</div>
+    </div>
+    <div class="stat-card stat-draft">
+      <div class="stat-label">Drafts</div>
+      <div class="stat-count" id="stat-draft">–</div>
+    </div>
+    <div class="stat-card stat-published">
+      <div class="stat-label">Published</div>
+      <div class="stat-count" id="stat-published">–</div>
+    </div>
+  </div>
+
+  <div class="action-cards">
+    <div class="action-card action-card-primary" onclick="newStory()">
+      <div class="action-icon">+</div>
+      <div class="action-label">New Story</div>
+      <div class="action-desc">Start a blank draft</div>
+    </div>
+    <div class="action-card" onclick="showQueueFiltered('submitted')">
+      <div class="action-icon">&#128393;</div>
+      <div class="action-label">Submissions</div>
+      <div class="action-desc">Articles awaiting review</div>
+    </div>
+    <div class="action-card" onclick="showQueueFiltered('draft')">
+      <div class="action-icon">&#128196;</div>
+      <div class="action-label">Drafts</div>
+      <div class="action-desc">Works in progress</div>
+    </div>
+    <div class="action-card" onclick="showQueueFiltered('published')">
+      <div class="action-icon">&#9989;</div>
+      <div class="action-label">Published</div>
+      <div class="action-desc">Live on the news site</div>
+    </div>
+    <div class="action-card" onclick="showQueueFiltered('')">
+      <div class="action-icon">&#128240;</div>
+      <div class="action-label">All Articles</div>
+      <div class="action-desc">Everything in the queue</div>
+    </div>
+  </div>
 </div>
 
 <!-- ── Queue View ── -->
-<div id="queue-view">
-  <div class="tabs">
-    <div class="tab active" data-status="">All</div>
-    <div class="tab" data-status="submitted">Submitted</div>
-    <div class="tab" data-status="draft">Draft</div>
-    <div class="tab" data-status="published">Published</div>
+<div id="queue-view" style="display:none">
+  <div style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:#fff;padding:0 24px">
+    <button class="back-btn" style="margin:0;padding:10px 12px 10px 0;border-bottom:2px solid transparent" onclick="showDashboard()">&larr; Dashboard</button>
+    <div class="tabs" style="border-bottom:none;padding:0;margin-left:8px;flex:1">
+      <div class="tab active" data-status="">All</div>
+      <div class="tab" data-status="submitted">Submitted</div>
+      <div class="tab" data-status="draft">Draft</div>
+      <div class="tab" data-status="published">Published</div>
+    </div>
   </div>
   <div id="search-bar" style="display:none;padding:12px 24px 0;max-width:1200px">
     <input type="search" id="search-input" placeholder="Search published articles..."
@@ -435,6 +646,8 @@
 <div id="detail-view" class="detail">
   <button class="back-btn" onclick="showQueue()">&larr; Back to queue</button>
 
+  <div id="status-banner" class="status-banner" style="display:none"></div>
+
   <div id="feedback-callout" class="feedback-callout" style="display:none">
     <strong>Review feedback</strong>
     <span id="feedback-text"></span>
@@ -445,6 +658,12 @@
     <div class="panel">
       <h2>Edit <span id="ed-id" style="font-weight:400;font-size:12px;color:var(--muted-fg);font-family:monospace;text-transform:none;letter-spacing:0"></span></h2>
       <div id="detail-cover"></div>
+
+      <div id="polish-prompt" class="polish-prompt" style="display:none">
+        <p>Raw submission — clean it up before editing.</p>
+        <button class="btn btn-blue" id="btn-polish-prompt" onclick="polishArticle()">Clean up &amp; format</button>
+      </div>
+
       <div class="field">
         <label>Title</label>
         <input type="text" id="ed-title">
@@ -465,8 +684,10 @@
         <textarea id="ed-excerpt" rows="3"></textarea>
       </div>
       <div class="field">
-        <label>Body (HTML)</label>
-        <textarea id="ed-body" class="body-input" oninput="updatePreview()"></textarea>
+        <label>Body</label>
+        <div class="quill-wrap">
+          <div id="ed-body-editor"></div>
+        </div>
       </div>
 
       <div class="actions" id="action-bar"></div>
@@ -512,14 +733,32 @@
 <!-- ── Toast ── -->
 <div id="toast" class="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
 <script>
-const PB_URL = '';  // proxied through our backend
+// ── Quill setup ────────────────────────────────────────────────────
+const quill = new Quill('#ed-body-editor', {
+  theme: 'snow',
+  modules: {
+    toolbar: [
+      [{ header: [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['blockquote', 'link', 'image'],
+      ['clean']
+    ]
+  }
+});
+
+quill.on('text-change', () => updatePreview());
+
+// ── State ──────────────────────────────────────────────────────────
 let currentArticle = null;
 let polishedBody = '';
 let currentFilter = '';
 let currentSearch = '';
 let currentPage = 1;
 let totalPages = 1;
+let isCreateMode = false;
 let searchDebounce = null;
 
 // ── Utilities ──────────────────────────────────────────────────────
@@ -553,6 +792,10 @@ function coverUrl(article, size) {
   return `/api/articles/${article.id}/cover?thumb=${size || '200x140'}`;
 }
 
+function setHeaderSubtitle(text) {
+  document.getElementById('header-subtitle').textContent = text;
+}
+
 // ── API helpers ────────────────────────────────────────────────────
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -566,6 +809,30 @@ async function api(method, path, body) {
     throw new Error(txt);
   }
   return r.json();
+}
+
+// ── Dashboard View ─────────────────────────────────────────────────
+async function showDashboard() {
+  document.getElementById('queue-view').style.display = 'none';
+  document.getElementById('detail-view').classList.remove('visible');
+  document.getElementById('dashboard-view').classList.add('visible');
+  setHeaderSubtitle('Dashboard');
+  currentArticle = null;
+  isCreateMode = false;
+
+  // Reset counts while loading
+  ['submitted', 'draft', 'published'].forEach(s => {
+    document.getElementById('stat-' + s).textContent = '–';
+  });
+
+  try {
+    const stats = await api('GET', '/api/stats');
+    document.getElementById('stat-submitted').textContent = stats.submitted ?? '–';
+    document.getElementById('stat-draft').textContent = stats.draft ?? '–';
+    document.getElementById('stat-published').textContent = stats.published ?? '–';
+  } catch (e) {
+    // Stats failing silently is acceptable — dashboard still usable
+  }
 }
 
 // ── Queue View ─────────────────────────────────────────────────────
@@ -587,6 +854,14 @@ function buildArticleCard(a) {
         </div>
       </div>
     </div>`;
+}
+
+function showQueueFiltered(status) {
+  currentFilter = status;
+  document.getElementById('dashboard-view').classList.remove('visible');
+  document.getElementById('queue-view').style.display = '';
+  setHeaderSubtitle('Editorial Queue');
+  loadQueue(status);
 }
 
 async function loadQueue(status) {
@@ -695,6 +970,7 @@ async function openArticle(id) {
   document.getElementById('queue-view').style.display = 'none';
   const detail = document.getElementById('detail-view');
   detail.classList.add('visible');
+  isCreateMode = false;
 
   try {
     currentArticle = await api('GET', `/api/articles/${id}`);
@@ -720,7 +996,14 @@ function populateDetail() {
   document.getElementById('ed-title').value = a.title || '';
   document.getElementById('ed-category').value = a.category || 'News';
   document.getElementById('ed-excerpt').value = a.excerpt || '';
-  document.getElementById('ed-body').value = a.body || '';
+  quill.root.innerHTML = a.body || '';
+
+  // Status banner
+  renderStatusBanner(a.status);
+
+  // Polish prompt for submitted articles
+  document.getElementById('polish-prompt').style.display =
+    a.status === 'submitted' ? 'flex' : 'none';
 
   // Feedback callout
   const fb = document.getElementById('feedback-callout');
@@ -739,11 +1022,34 @@ function populateDetail() {
 
   // Hide reject form
   toggleRejectForm(false);
+
+  // Header subtitle
+  setHeaderSubtitle(a.title || 'Article');
+}
+
+function renderStatusBanner(status) {
+  const el = document.getElementById('status-banner');
+  const labels = {
+    submitted: 'New Submission',
+    draft: 'Draft',
+    published: 'Published',
+    pending_edit: 'Pending Edit',
+  };
+  const classes = {
+    submitted: 'status-banner-submitted',
+    draft: 'status-banner-draft',
+    published: 'status-banner-published',
+    pending_edit: 'status-banner-submitted',
+  };
+  const label = labels[status] || status;
+  const cls = classes[status] || 'status-banner-draft';
+  el.className = 'status-banner ' + cls;
+  el.innerHTML = `<span class="status-banner-label">${esc(label)}</span>`;
+  el.style.display = 'flex';
 }
 
 function updatePreview() {
-  const body = document.getElementById('ed-body').value;
-  document.getElementById('preview').innerHTML = body;
+  document.getElementById('preview').innerHTML = quill.root.innerHTML;
 }
 
 function renderActions(status) {
@@ -753,8 +1059,14 @@ function renderActions(status) {
   // Save — always
   html += '<button class="btn btn-primary" onclick="saveArticle()">Save</button>';
 
-  // Polish — always
-  html += '<button class="btn" onclick="polishArticle()" id="btn-polish">Polish with AI</button>';
+  // Polish — always (smaller, in action bar for non-submitted)
+  if (status !== 'submitted') {
+    html += '<button class="btn" onclick="polishArticle()" id="btn-polish">Polish with AI</button>';
+  } else {
+    html += '<button class="btn" onclick="polishArticle()" id="btn-polish">Polish with AI</button>';
+    // Accept button for submitted
+    html += '<button class="btn btn-blue" onclick="acceptArticle()">Accept to Draft</button>';
+  }
 
   // Publish — for submitted, draft, pending_edit
   if (['submitted', 'draft', 'pending_edit'].includes(status)) {
@@ -777,17 +1089,36 @@ function renderActions(status) {
 // ── Actions ────────────────────────────────────────────────────────
 async function saveArticle() {
   try {
+    const body = quill.root.innerHTML;
     const data = {
       title: document.getElementById('ed-title').value,
-      body: document.getElementById('ed-body').value,
+      body: body,
       excerpt: document.getElementById('ed-excerpt').value,
       category: document.getElementById('ed-category').value,
     };
-    currentArticle = await api('PATCH', `/api/articles/${currentArticle.id}`, data);
-    toast('Saved');
-    populateDetail();
+
+    if (isCreateMode) {
+      currentArticle = await api('POST', '/api/articles', data);
+      isCreateMode = false;
+      toast('Draft created');
+      populateDetail();
+    } else {
+      currentArticle = await api('PATCH', `/api/articles/${currentArticle.id}`, data);
+      toast('Saved');
+      populateDetail();
+    }
   } catch (e) {
     toast('Save failed: ' + e.message);
+  }
+}
+
+async function acceptArticle() {
+  try {
+    currentArticle = await api('POST', `/api/articles/${currentArticle.id}/accept`);
+    toast('Accepted — moved to draft');
+    populateDetail();
+  } catch (e) {
+    toast('Accept failed: ' + e.message);
   }
 }
 
@@ -830,27 +1161,38 @@ async function archiveArticle() {
 }
 
 async function polishArticle() {
+  // For submitted articles the prompt button also drives polish
+  const promptBtn = document.getElementById('btn-polish-prompt');
   const btn = document.getElementById('btn-polish');
-  btn.disabled = true;
-  btn.textContent = 'Polishing...';
+  if (promptBtn) { promptBtn.disabled = true; promptBtn.textContent = 'Polishing...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Polishing...'; }
+
+  // Save current Quill content to PB first so polish endpoint reads latest
+  const currentBody = quill.root.innerHTML;
+
   try {
+    // Patch the body to PB so polish endpoint reads current editor state
+    if (!isCreateMode && currentArticle) {
+      await api('PATCH', `/api/articles/${currentArticle.id}`, { body: currentBody });
+    }
+
     const result = await api('POST', `/api/articles/${currentArticle.id}/polish`);
     polishedBody = result.polished;
 
     // Show modal
-    document.getElementById('polish-original').innerHTML = currentArticle.body || '';
+    document.getElementById('polish-original').innerHTML = currentBody;
     document.getElementById('polish-result').innerHTML = polishedBody;
     document.getElementById('polish-modal').classList.add('visible');
   } catch (e) {
     toast('Polish failed: ' + e.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Polish with AI';
+    if (promptBtn) { promptBtn.disabled = false; promptBtn.textContent = 'Clean up & format'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Polish with AI'; }
   }
 }
 
 function acceptPolish() {
-  document.getElementById('ed-body').value = polishedBody;
+  quill.root.innerHTML = polishedBody;
   updatePreview();
   closePolishModal();
   toast('Polished text applied — click Save to persist');
@@ -860,12 +1202,43 @@ function closePolishModal() {
   document.getElementById('polish-modal').classList.remove('visible');
 }
 
+// ── New Story ──────────────────────────────────────────────────────
+function newStory() {
+  isCreateMode = true;
+  currentArticle = null;
+
+  document.getElementById('dashboard-view').classList.remove('visible');
+  document.getElementById('queue-view').style.display = 'none';
+  document.getElementById('detail-view').classList.add('visible');
+  setHeaderSubtitle('New Story');
+
+  // Clear all fields
+  document.getElementById('ed-id').textContent = 'new';
+  document.getElementById('detail-cover').innerHTML = '';
+  document.getElementById('ed-title').value = '';
+  document.getElementById('ed-category').value = 'News';
+  document.getElementById('ed-excerpt').value = '';
+  quill.root.innerHTML = '';
+  document.getElementById('preview').innerHTML = '';
+  document.getElementById('feedback-callout').style.display = 'none';
+  document.getElementById('status-banner').style.display = 'none';
+  document.getElementById('polish-prompt').style.display = 'none';
+  toggleRejectForm(false);
+
+  // Action bar for create mode
+  const bar = document.getElementById('action-bar');
+  bar.innerHTML = '<button class="btn btn-primary" onclick="saveArticle()">Create Draft</button>';
+}
+
 // ── Navigation ─────────────────────────────────────────────────────
 function showQueue() {
   document.getElementById('detail-view').classList.remove('visible');
+  document.getElementById('dashboard-view').classList.remove('visible');
   document.getElementById('queue-view').style.display = '';
+  setHeaderSubtitle('Editorial Queue');
   currentArticle = null;
-  loadQueue(currentFilter);  // re-fetch current tab (preserves filter, resets to page 1)
+  isCreateMode = false;
+  loadQueue(currentFilter);
 }
 
 // ── Tab clicks ─────────────────────────────────────────────────────
@@ -874,7 +1247,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ── Init ───────────────────────────────────────────────────────────
-loadQueue();
+showDashboard();
 </script>
 </body>
 </html>
