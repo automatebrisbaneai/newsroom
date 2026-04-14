@@ -161,9 +161,6 @@
       gap: 16px;
       margin-bottom: 24px;
     }
-    @media (max-width: 600px) {
-      .stats-row { grid-template-columns: 1fr; }
-    }
     .stat-card {
       background: #fff;
       border: 1px solid var(--border);
@@ -291,12 +288,7 @@
     }
 
     .detail-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-    }
-    @media (max-width: 768px) {
-      .detail-layout { grid-template-columns: 1fr; }
+      max-width: 800px;
     }
 
     .panel {
@@ -378,17 +370,6 @@
       margin-bottom: 14px;
     }
 
-    /* ── Preview ── */
-    .preview-content {
-      font-size: 15px;
-      line-height: 1.7;
-      color: var(--foreground);
-    }
-    .preview-content img { max-width: 100%; border-radius: 6px; }
-    .preview-content p   { margin-bottom: 12px; }
-    .preview-content h1, .preview-content h2, .preview-content h3 {
-      margin: 16px 0 8px;
-    }
 
     /* ── Review feedback callout ── */
     .feedback-callout {
@@ -701,11 +682,6 @@
       </div>
     </div>
 
-    <!-- Preview panel -->
-    <div class="panel">
-      <h2>Preview</h2>
-      <div id="preview" class="preview-content"></div>
-    </div>
   </div>
 </div>
 
@@ -1062,9 +1038,7 @@ function renderStatusBanner(status) {
   el.style.display = 'flex';
 }
 
-function updatePreview() {
-  document.getElementById('preview').innerHTML = quill.root.innerHTML;
-}
+function updatePreview() {}
 
 function renderActions(status) {
   const bar = document.getElementById('action-bar');
