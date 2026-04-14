@@ -1217,16 +1217,16 @@ async function polishArticle() {
   }
 }
 
-function acceptPolish() {
+async function acceptPolish() {
   quill.root.innerHTML = polishedBody;
   if (polishedTitle) document.getElementById('ed-title').value = polishedTitle;
   if (polishedExcerpt) document.getElementById('ed-excerpt').value = polishedExcerpt;
   updatePreview();
   closePolishModal();
-  const parts = ['body'];
-  if (polishedTitle) parts.push('title');
-  if (polishedExcerpt) parts.push('excerpt');
-  toast(`Updated ${parts.join(', ')} — click Save to persist`);
+  // Auto-save and hide the polish prompt
+  await saveArticle();
+  const promptEl = document.getElementById('polish-prompt');
+  if (promptEl) promptEl.style.display = 'none';
 }
 
 function closePolishModal() {
