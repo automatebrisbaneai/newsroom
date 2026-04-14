@@ -239,7 +239,7 @@ async def polish_article(article_id: str, payload: PolishBody | None = None):
     )
     data = res.json()
     if "choices" not in data:
-        raise HTTPException(status_code=502, detail=f"OpenRouter error: {data}")
+        raise HTTPException(status_code=502, detail=f"AI polish failed: {data.get('error', {}).get('message', 'unknown error')}")
     raw = data["choices"][0]["message"]["content"]
     try:
         parsed = json.loads(raw)

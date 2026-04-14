@@ -737,7 +737,6 @@ const quill = new Quill('#ed-body-editor', {
   }
 });
 
-quill.on('text-change', () => updatePreview());
 
 // ── State ──────────────────────────────────────────────────────────
 let currentArticle = null;
@@ -750,6 +749,8 @@ let currentPage = 1;
 let totalPages = 1;
 let isCreateMode = false;
 let searchDebounce = null;
+
+const PB_FILES = 'https://pb-news.croquetwade.com/api/files';
 
 // ── Utilities ──────────────────────────────────────────────────────
 function toast(msg) {
@@ -779,7 +780,7 @@ function badgeLabel(status) {
 
 function coverUrl(article, size) {
   if (!article.cover_image) return '';
-  return `/api/articles/${article.id}/cover?thumb=${size || '200x140'}`;
+  return `${PB_FILES}/${article.collectionId}/${article.id}/${article.cover_image}?thumb=${size || '200x140'}`;
 }
 
 function setHeaderSubtitle(text) {
@@ -828,7 +829,7 @@ async function showDashboard() {
 // ── Queue View ─────────────────────────────────────────────────────
 function buildArticleCard(a) {
   const coverHtml = a.cover_image
-    ? `<img class="card-cover" src="/api/articles/${a.id}/cover?thumb=200x140&filename=${encodeURIComponent(a.cover_image)}&collection_id=${encodeURIComponent(a.collectionId)}" alt="" loading="lazy">`
+    ? `<img class="card-cover" src="${coverUrl(a, '200x140')}" alt="" loading="lazy">`
     : `<div class="card-cover-placeholder">No cover image</div>`;
   return `
     <div class="card" onclick="openArticle('${a.id}')">
@@ -976,7 +977,7 @@ function populateDetail() {
   // Cover image
   const coverEl = document.getElementById('detail-cover');
   if (a.cover_image) {
-    coverEl.innerHTML = `<img class="cover-img" src="/api/articles/${a.id}/cover?thumb=600x400" alt="">`;
+    coverEl.innerHTML = `<img class="cover-img" src="${coverUrl(a, '600x400')}" alt="">`;
   } else {
     coverEl.innerHTML = '';
   }
@@ -1003,9 +1004,6 @@ function populateDetail() {
   } else {
     fb.style.display = 'none';
   }
-
-  // Preview
-  updatePreview();
 
   // Action buttons
   renderActions(a.status);
@@ -1038,7 +1036,6 @@ function renderStatusBanner(status) {
   el.style.display = 'flex';
 }
 
-function updatePreview() {}
 
 function renderActions(status) {
   const bar = document.getElementById('action-bar');
@@ -1190,7 +1187,6 @@ async function acceptPolish() {
   quill.root.innerHTML = polishedBody;
   if (polishedTitle) document.getElementById('ed-title').value = polishedTitle;
   if (polishedExcerpt) document.getElementById('ed-excerpt').value = polishedExcerpt;
-  updatePreview();
   closePolishModal();
   // Auto-save and hide the polish prompt
   await saveArticle();
@@ -1222,7 +1218,6 @@ function newStory() {
   document.getElementById('ed-category').value = 'News';
   document.getElementById('ed-excerpt').value = '';
   quill.root.innerHTML = '';
-  document.getElementById('preview').innerHTML = '';
   document.getElementById('feedback-callout').style.display = 'none';
   document.getElementById('status-banner').style.display = 'none';
   document.getElementById('polish-prompt').style.display = 'none';
