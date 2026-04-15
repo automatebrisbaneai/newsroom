@@ -61,7 +61,7 @@ def _pb_request(method: str, path: str, **kwargs):
     r = getattr(http_requests, method)(
         url, headers={"Authorization": f"Bearer {token}"}, timeout=15, **kwargs
     )
-    if r.status_code == 401:
+    if r.status_code in (401, 403):
         token = refresh_token()
         r = getattr(http_requests, method)(
             url, headers={"Authorization": f"Bearer {token}"}, timeout=15, **kwargs
