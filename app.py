@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
@@ -12,6 +14,9 @@ import requests as http_requests
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 app = FastAPI()
 
@@ -53,6 +58,27 @@ def refresh_token() -> str:
     return _pb_token
 
 
+# ── Startup auth verification ────────────────────────────────────────
+@app.on_event("startup")
+def _verify_pb_auth_on_startup():
+    """Fail fast if PB credentials are missing or wrong.
+
+    This prevents the silent-degradation bug where empty env vars cause _auth()
+    to return a 400, the token stays empty, and anonymous list rules return
+    published-only data with no visible error.
+    """
+    global _pb_token
+    try:
+        _pb_token = _auth()
+        logger.info("PB auth OK as %s", PB_NEWS_EMAIL)
+    except Exception as exc:
+        logger.critical(
+            "FATAL: PB auth failed — check PB_NEWS_ADMIN_EMAIL / PB_NEWS_ADMIN_PASSWORD. Error: %s",
+            exc,
+        )
+        sys.exit(1)
+
+
 # ── Helpers ─────────────────────────────────────────────────────────
 def _pb_request(method: str, path: str, **kwargs):
     """Make a PB request with 401-retry."""
@@ -91,6 +117,24 @@ class CreateBody(BaseModel):
 
 
 # ── Routes ──────────────────────────────────────────────────────────
+@app.get("/healthz")
+async def healthz():
+    """Health check: forces a fresh PB auth round-trip.
+
+    Returns 200 with pb_auth:ok on success, 503 with pb_auth:failed on error.
+    Used by Docker HEALTHCHECK and Coolify monitoring.
+    """
+    try:
+        _auth()
+        return {"status": "ok", "pb_auth": "ok", "pb_url": PB_NEWS_URL}
+    except Exception as exc:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "pb_auth": "failed", "error": str(exc)},
+        )
+
+
 @app.get("/")
 async def root():
     html_path = Path(__file__).parent / "index.html"
