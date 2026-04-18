@@ -1,8 +1,10 @@
+import base64
 import json
 import logging
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
@@ -31,8 +33,26 @@ PB_NEWS_PASSWORD = os.environ.get(
 )
 POLISH_MODEL = "deepseek/deepseek-v3.2"
 
-# ── PocketBase auth (copied from newsroom-share/app.py) ────────────
+# ── PocketBase auth ─────────────────────────────────────────────────
 _pb_token: str = ""
+
+# Refresh 5 minutes before the JWT actually expires to avoid racing the deadline.
+_TOKEN_REFRESH_MARGIN = 300
+
+
+def _token_exp(token: str) -> float:
+    """Decode the JWT exp claim without verifying the signature."""
+    try:
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (4 - len(payload_b64) % 4)
+        return float(json.loads(base64.urlsafe_b64decode(payload_b64)).get("exp", 0))
+    except Exception:
+        return 0.0
+
+
+def _token_is_stale(token: str) -> bool:
+    """True if token is missing or expires within the refresh margin."""
+    return not token or time.time() >= (_token_exp(token) - _TOKEN_REFRESH_MARGIN)
 
 
 def _auth() -> str:
@@ -45,10 +65,33 @@ def _auth() -> str:
     return r.json()["token"]
 
 
-def get_token() -> str:
-    global _pb_token
+def _auth_refresh() -> str:
+    """Extend the current token's lifetime via PocketBase auth-refresh.
+
+    Fails loudly if there is no token or if PocketBase rejects the refresh.
+    Callers fall back to full _auth() on failure.
+    """
     if not _pb_token:
-        _pb_token = _auth()
+        raise ValueError("No token to refresh")
+    r = http_requests.post(
+        f"{PB_NEWS_URL}/api/collections/_superusers/auth-refresh",
+        headers={"Authorization": f"Bearer {_pb_token}"},
+        timeout=10,
+    )
+    r.raise_for_status()
+    return r.json()["token"]
+
+
+def get_token() -> str:
+    """Return a fresh token, refreshing proactively before expiry."""
+    global _pb_token
+    if _token_is_stale(_pb_token):
+        try:
+            _pb_token = _auth_refresh()
+            logger.info("PB token refreshed via auth-refresh")
+        except Exception as exc:
+            logger.warning("auth-refresh failed (%s), falling back to full auth", exc)
+            _pb_token = _auth()
     return _pb_token
 
 
@@ -125,7 +168,8 @@ async def healthz():
     Used by Docker HEALTHCHECK and Coolify monitoring.
     """
     try:
-        _auth()
+        global _pb_token
+        _pb_token = _auth()
         return {"status": "ok", "pb_auth": "ok", "pb_url": PB_NEWS_URL}
     except Exception as exc:
         from fastapi.responses import JSONResponse
