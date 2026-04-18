@@ -107,9 +107,9 @@ async def cover_image(
     """Redirect browser directly to PocketBase file URL (files are public — no proxy needed)."""
     if not filename or not collection_id:
         article = _api("get", f"/api/newsroom/{article_id}").json()
-        filename = article.get("cover_image")
-        collection_id = article.get("collectionId", "")
-    if not filename:
+        cover_url = article.get("cover_image_url")
+        if cover_url:
+            return RedirectResponse(url=f"{cover_url}?thumb={thumb}", status_code=302)
         raise HTTPException(status_code=404, detail="No cover image")
     pb_url = (
         f"{PB_NEWS_URL}/api/files/{collection_id}/{article_id}/{filename}"
@@ -131,10 +131,7 @@ async def list_articles(
     if search:
         params["search"] = search
     r = _api("get", "/api/newsroom", params=params)
-    data = r.json()
-    data["totalItems"] = data.pop("total", 0)
-    data["totalPages"] = -(-data["totalItems"] // perPage)  # ceiling division
-    return data
+    return r.json()
 
 
 @app.get("/api/articles/{article_id}")
@@ -237,7 +234,7 @@ async def get_stats():
             "/api/newsroom",
             params={"type": "article", "scope": "all", "status": status, "perPage": 1},
         )
-        counts[status] = r.json().get("total", 0)
+        counts[status] = r.json().get("totalItems", 0)
     return counts
 
 
