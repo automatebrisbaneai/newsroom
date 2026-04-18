@@ -779,8 +779,10 @@ function badgeLabel(status) {
 }
 
 function coverUrl(article, size) {
+  const thumb = size || '200x140';
+  if (article.cover_image_url) return `${article.cover_image_url}?thumb=${thumb}`;
   if (!article.cover_image) return '';
-  return `${PB_FILES}/${article.collectionId}/${article.id}/${article.cover_image}?thumb=${size || '200x140'}`;
+  return `${PB_FILES}/${article.collectionId}/${article.id}/${article.cover_image}?thumb=${thumb}`;
 }
 
 function setHeaderSubtitle(text) {
@@ -828,7 +830,7 @@ async function showDashboard() {
 
 // ── Queue View ─────────────────────────────────────────────────────
 function buildArticleCard(a) {
-  const coverHtml = a.cover_image
+  const coverHtml = (a.cover_image || a.cover_image_url)
     ? `<img class="card-cover" src="${coverUrl(a, '200x140')}" alt="" loading="lazy">`
     : `<div class="card-cover-placeholder">No cover image</div>`;
   return `
@@ -976,7 +978,7 @@ function populateDetail() {
 
   // Cover image
   const coverEl = document.getElementById('detail-cover');
-  if (a.cover_image) {
+  if (a.cover_image || a.cover_image_url) {
     coverEl.innerHTML = `<img class="cover-img" src="${coverUrl(a, '600x400')}" alt="">`;
   } else {
     coverEl.innerHTML = '';
