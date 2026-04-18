@@ -1,10 +1,7 @@
-import base64
 import json
 import logging
 import os
-import re
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
@@ -25,119 +22,35 @@ app = FastAPI()
 # ── Config ──────────────────────────────────────────────────────────
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 PB_NEWS_URL = os.environ.get("PB_NEWS_URL", "https://pb-news.croquetwade.com")
-PB_NEWS_EMAIL = os.environ.get(
-    "PB_NEWS_ADMIN_EMAIL", os.environ.get("PB_ADMIN_EMAIL", "")
-)
-PB_NEWS_PASSWORD = os.environ.get(
-    "PB_NEWS_ADMIN_PASSWORD", os.environ.get("PB_ADMIN_PASSWORD", "")
-)
+MYCROQUET_API_URL = os.environ.get("NEWSROOM_API_URL", "https://my.croquetwade.com")
+NEWSROOM_API_TOKEN = os.environ.get("NEWSROOM_API_TOKEN", "")
 POLISH_MODEL = "deepseek/deepseek-v3.2"
 
-# ── PocketBase auth ─────────────────────────────────────────────────
-_pb_token: str = ""
 
-# Refresh 5 minutes before the JWT actually expires to avoid racing the deadline.
-_TOKEN_REFRESH_MARGIN = 300
-
-
-def _token_exp(token: str) -> float:
-    """Decode the JWT exp claim without verifying the signature."""
-    try:
-        payload_b64 = token.split(".")[1]
-        payload_b64 += "=" * (4 - len(payload_b64) % 4)
-        return float(json.loads(base64.urlsafe_b64decode(payload_b64)).get("exp", 0))
-    except Exception:
-        return 0.0
-
-
-def _token_is_stale(token: str) -> bool:
-    """True if token is missing or expires within the refresh margin."""
-    return not token or time.time() >= (_token_exp(token) - _TOKEN_REFRESH_MARGIN)
-
-
-def _auth() -> str:
-    r = http_requests.post(
-        f"{PB_NEWS_URL}/api/collections/_superusers/auth-with-password",
-        json={"identity": PB_NEWS_EMAIL, "password": PB_NEWS_PASSWORD},
-        timeout=10,
-    )
-    r.raise_for_status()
-    return r.json()["token"]
-
-
-def _auth_refresh() -> str:
-    """Extend the current token's lifetime via PocketBase auth-refresh.
-
-    Fails loudly if there is no token or if PocketBase rejects the refresh.
-    Callers fall back to full _auth() on failure.
-    """
-    if not _pb_token:
-        raise ValueError("No token to refresh")
-    r = http_requests.post(
-        f"{PB_NEWS_URL}/api/collections/_superusers/auth-refresh",
-        headers={"Authorization": f"Bearer {_pb_token}"},
-        timeout=10,
-    )
-    r.raise_for_status()
-    return r.json()["token"]
-
-
-def get_token() -> str:
-    """Return a fresh token, refreshing proactively before expiry."""
-    global _pb_token
-    if _token_is_stale(_pb_token):
-        try:
-            _pb_token = _auth_refresh()
-            logger.info("PB token refreshed via auth-refresh")
-        except Exception as exc:
-            logger.warning("auth-refresh failed (%s), falling back to full auth", exc)
-            _pb_token = _auth()
-    return _pb_token
-
-
-def refresh_token() -> str:
-    global _pb_token
-    _pb_token = _auth()
-    return _pb_token
-
-
-# ── Startup auth verification ────────────────────────────────────────
-@app.on_event("startup")
-def _verify_pb_auth_on_startup():
-    """Fail fast if PB credentials are missing or wrong.
-
-    This prevents the silent-degradation bug where empty env vars cause _auth()
-    to return a 400, the token stays empty, and anonymous list rules return
-    published-only data with no visible error.
-    """
-    global _pb_token
-    try:
-        _pb_token = _auth()
-        logger.info("PB auth OK as %s", PB_NEWS_EMAIL)
-    except Exception as exc:
-        logger.critical(
-            "FATAL: PB auth failed — check PB_NEWS_ADMIN_EMAIL / PB_NEWS_ADMIN_PASSWORD. Error: %s",
-            exc,
-        )
-        sys.exit(1)
-
-
-# ── Helpers ─────────────────────────────────────────────────────────
-def _pb_request(method: str, path: str, **kwargs):
-    """Make a PB request with 401-retry."""
-    url = f"{PB_NEWS_URL}{path}"
-    token = get_token()
-    r = getattr(http_requests, method)(
-        url, headers={"Authorization": f"Bearer {token}"}, timeout=15, **kwargs
-    )
-    if r.status_code in (401, 403):
-        token = refresh_token()
-        r = getattr(http_requests, method)(
-            url, headers={"Authorization": f"Bearer {token}"}, timeout=15, **kwargs
-        )
+# ── HTTP helper ──────────────────────────────────────────────────────
+def _api(method: str, path: str, **kwargs):
+    """Call MyCroquet /api/newsroom with subdomain bearer token."""
+    url = f"{MYCROQUET_API_URL}{path}"
+    headers = {"Authorization": f"Bearer {NEWSROOM_API_TOKEN}", "Content-Type": "application/json"}
+    r = getattr(http_requests, method)(url, headers=headers, timeout=15, **kwargs)
     if not r.ok:
         raise HTTPException(status_code=r.status_code, detail=r.text)
     return r
+
+
+# ── Startup check ────────────────────────────────────────────────────
+@app.on_event("startup")
+def _verify_api_on_startup():
+    """Fail fast if NEWSROOM_API_TOKEN is missing or the API is unreachable."""
+    if not NEWSROOM_API_TOKEN:
+        logger.critical("FATAL: NEWSROOM_API_TOKEN is not set.")
+        sys.exit(1)
+    try:
+        _api("get", "/api/newsroom", params={"type": "article", "scope": "all", "perPage": 1})
+        logger.info("MyCroquet API ping OK at %s", MYCROQUET_API_URL)
+    except Exception as exc:
+        logger.critical("FATAL: MyCroquet API ping failed — check NEWSROOM_API_URL / NEWSROOM_API_TOKEN. Error: %s", exc)
+        sys.exit(1)
 
 
 # ── Pydantic models ────────────────────────────────────────────────
@@ -162,20 +75,19 @@ class CreateBody(BaseModel):
 # ── Routes ──────────────────────────────────────────────────────────
 @app.get("/healthz")
 async def healthz():
-    """Health check: forces a fresh PB auth round-trip.
+    """Health check: pings the MyCroquet API.
 
-    Returns 200 with pb_auth:ok on success, 503 with pb_auth:failed on error.
+    Returns 200 with api:ok on success, 503 on error.
     Used by Docker HEALTHCHECK and Coolify monitoring.
     """
     try:
-        global _pb_token
-        _pb_token = _auth()
-        return {"status": "ok", "pb_auth": "ok", "pb_url": PB_NEWS_URL}
+        _api("get", "/api/newsroom", params={"type": "article", "scope": "all", "perPage": 1})
+        return {"status": "ok", "api": "ok", "api_url": MYCROQUET_API_URL}
     except Exception as exc:
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
-            content={"status": "unhealthy", "pb_auth": "failed", "error": str(exc)},
+            content={"status": "unhealthy", "api": "failed", "error": str(exc)},
         )
 
 
@@ -194,9 +106,7 @@ async def cover_image(
 ):
     """Redirect browser directly to PocketBase file URL (files are public — no proxy needed)."""
     if not filename or not collection_id:
-        article = _pb_request(
-            "get", f"/api/collections/news_articles/records/{article_id}"
-        ).json()
+        article = _api("get", f"/api/newsroom/{article_id}").json()
         filename = article.get("cover_image")
         collection_id = article.get("collectionId", "")
     if not filename:
@@ -215,26 +125,21 @@ async def list_articles(
     page: int = 1,
     perPage: int = 20,
 ):
-    filter_parts = ["status!='archived'"]
+    params: dict = {"type": "article", "scope": "all", "page": page, "perPage": perPage}
     if status:
-        filter_parts.append(f"status='{status}'")
+        params["status"] = status
     if search:
-        safe = search.replace("'", "")
-        filter_parts.append(
-            f"(title~'{safe}' || body~'{safe}' || author_name~'{safe}')"
-        )
-    pb_filter = " && ".join(filter_parts)
-    r = _pb_request(
-        "get",
-        "/api/collections/news_articles/records",
-        params={"sort": "-updated", "filter": pb_filter, "page": page, "perPage": perPage},
-    )
-    return r.json()
+        params["search"] = search
+    r = _api("get", "/api/newsroom", params=params)
+    data = r.json()
+    data["totalItems"] = data.pop("total", 0)
+    data["totalPages"] = -(-data["totalItems"] // perPage)  # ceiling division
+    return data
 
 
 @app.get("/api/articles/{article_id}")
 async def get_article(article_id: str):
-    r = _pb_request("get", f"/api/collections/news_articles/records/{article_id}")
+    r = _api("get", f"/api/newsroom/{article_id}")
     return r.json()
 
 
@@ -243,40 +148,25 @@ async def patch_article(article_id: str, body: PatchBody):
     data = body.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=422, detail="No fields to update")
-    r = _pb_request(
-        "patch", f"/api/collections/news_articles/records/{article_id}", json=data
-    )
+    r = _api("patch", f"/api/newsroom/{article_id}", json=data)
     return r.json()
 
 
 @app.post("/api/articles/{article_id}/publish")
 async def publish_article(article_id: str):
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.000Z")
-    r = _pb_request(
-        "patch",
-        f"/api/collections/news_articles/records/{article_id}",
-        json={"status": "published", "published_at": now, "review_feedback": ""},
-    )
+    r = _api("post", f"/api/newsroom/{article_id}/approve", json={})
     return r.json()
 
 
 @app.post("/api/articles/{article_id}/reject")
 async def reject_article(article_id: str, body: RejectBody):
-    r = _pb_request(
-        "patch",
-        f"/api/collections/news_articles/records/{article_id}",
-        json={"status": "draft", "review_feedback": body.feedback},
-    )
+    r = _api("post", f"/api/newsroom/{article_id}/reject", json={"feedback": body.feedback})
     return r.json()
 
 
 @app.post("/api/articles/{article_id}/archive")
 async def archive_article(article_id: str):
-    r = _pb_request(
-        "patch",
-        f"/api/collections/news_articles/records/{article_id}",
-        json={"status": "archived"},
-    )
+    r = _api("post", f"/api/newsroom/{article_id}/archive", json={})
     return r.json()
 
 
@@ -286,13 +176,11 @@ class PolishBody(BaseModel):
 
 @app.post("/api/articles/{article_id}/polish")
 async def polish_article(article_id: str, payload: PolishBody | None = None):
-    # Use body from request if provided, otherwise fetch from PB
+    # Use body from request if provided, otherwise fetch from API
     if payload and payload.body.strip():
         article_body = payload.body
     else:
-        article = _pb_request(
-            "get", f"/api/collections/news_articles/records/{article_id}"
-        ).json()
+        article = _api("get", f"/api/newsroom/{article_id}").json()
         article_body = article.get("body", "")
     if not article_body.strip():
         raise HTTPException(status_code=422, detail="Article body is empty")
@@ -344,29 +232,26 @@ async def polish_article(article_id: str, payload: PolishBody | None = None):
 async def get_stats():
     counts = {}
     for status in ("submitted", "draft", "published"):
-        r = _pb_request(
+        r = _api(
             "get",
-            "/api/collections/news_articles/records",
-            params={"filter": f"status='{status}'", "perPage": 1},
+            "/api/newsroom",
+            params={"type": "article", "scope": "all", "status": status, "perPage": 1},
         )
-        counts[status] = r.json().get("totalItems", 0)
+        counts[status] = r.json().get("total", 0)
     return counts
 
 
 @app.post("/api/articles")
 async def create_article(body: CreateBody):
-    slug = re.sub(r"[^a-z0-9]+", "-", body.title.lower()).strip("-")
-    slug = slug[:80]
-    r = _pb_request(
+    r = _api(
         "post",
-        "/api/collections/news_articles/records",
+        "/api/newsroom",
         json={
+            "type": "article",
             "title": body.title,
             "body": body.body,
             "excerpt": body.excerpt,
             "category": body.category,
-            "status": "draft",
-            "slug": slug,
         },
     )
     return r.json()
@@ -374,9 +259,5 @@ async def create_article(body: CreateBody):
 
 @app.post("/api/articles/{article_id}/accept")
 async def accept_article(article_id: str):
-    r = _pb_request(
-        "patch",
-        f"/api/collections/news_articles/records/{article_id}",
-        json={"status": "draft", "review_feedback": ""},
-    )
+    r = _api("post", f"/api/newsroom/{article_id}/reject", json={"feedback": ""})
     return r.json()
