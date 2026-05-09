@@ -149,22 +149,34 @@ async def patch_article(article_id: str, body: PatchBody):
     return r.json()
 
 
+def _fetch_article(article_id: str) -> dict:
+    """Return the full article dict so action handlers can refresh client state.
+
+    MyCroquet's action endpoints (approve/reject/archive) return {ok: true}
+    rather than the updated record. The dashboard front-end overwrites its
+    in-memory article with whatever each action returns, so without this
+    refetch the form renders empty after every action. See bug audit
+    2026-05-10 in board i-want-you-to-encapsulated-biscuit.
+    """
+    return _api("get", f"/api/newsroom/{article_id}").json()
+
+
 @app.post("/api/articles/{article_id}/publish")
 async def publish_article(article_id: str):
-    r = _api("post", f"/api/newsroom/{article_id}/approve", json={})
-    return r.json()
+    _api("post", f"/api/newsroom/{article_id}/approve", json={})
+    return _fetch_article(article_id)
 
 
 @app.post("/api/articles/{article_id}/reject")
 async def reject_article(article_id: str, body: RejectBody):
-    r = _api("post", f"/api/newsroom/{article_id}/reject", json={"feedback": body.feedback})
-    return r.json()
+    _api("post", f"/api/newsroom/{article_id}/reject", json={"feedback": body.feedback})
+    return _fetch_article(article_id)
 
 
 @app.post("/api/articles/{article_id}/archive")
 async def archive_article(article_id: str):
-    r = _api("post", f"/api/newsroom/{article_id}/archive", json={})
-    return r.json()
+    _api("post", f"/api/newsroom/{article_id}/archive", json={})
+    return _fetch_article(article_id)
 
 
 class PolishBody(BaseModel):
@@ -256,5 +268,11 @@ async def create_article(body: CreateBody):
 
 @app.post("/api/articles/{article_id}/accept")
 async def accept_article(article_id: str):
-    r = _api("post", f"/api/newsroom/{article_id}/reject", json={"feedback": ""})
-    return r.json()
+    """Move a submitted article into draft state for editorial work.
+
+    Uses PATCH with explicit status change rather than the previous
+    /reject-with-empty-feedback hack (which only worked because MyCroquet's
+    reject route happened to flip submitted→draft on empty feedback).
+    """
+    _api("patch", f"/api/newsroom/{article_id}", json={"status": "draft"})
+    return _fetch_article(article_id)
